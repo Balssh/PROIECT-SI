@@ -1,0 +1,1229 @@
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.2.7.0
+OBJECT MODULE PLACED IN .\Objects\proiect.obj
+ASSEMBLER INVOKED BY: C:\Keil_v5\C51\BIN\A51.EXE proiect.a51 SET(SMALL) DEBUG PRINT(.\Listings\proiect.lst) OBJECT(.\Obj
+                      ects\proiect.obj) EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ;************************************************************************************
+                       2     ;*      TOATE FUNCTIONALITATILE CERUTE IN CADRUL PROIECTULUI AU FOST IMPLEMENTATE, DAR  *
+                       3     ;*      DIN CAUZA LIMITEI DE 2K A FOST NECESAR SA "COMPRIM" DOUA SAU MAI MULTE FUNCTII  *
+                       4     ;*      INTR-UNA, DE EXEMPLU, PENTRU AFISAREA STATUSULUI MODULULUI AM FOLOSIT O SINGURA *
+                       5     ;*      COMANDA (TASTA 'V') PENTRU A AFISA ATAT CUVANTUL DE STARE, CAT SI VALOAREA         
+                                  *
+                       6     ;*      CURENTA A CONTORULUI SI A REGISTRELOR DE PRESETARE DEODATA, DESI INITIAL LE        
+                                  *
+                       7     ;*      ASIGNASEM TASTE SEPARATE. EXPLICATII SUPLIMENTARE SE GASESC IN DOCUMENTATIE.    *
+                       8     ;*      CODUL CARE A FOST "COMPRIMAT" ESTE COMENTAT.                                       
+                                                          *
+                       9     ;************************************************************************************
+                      10             
+                      11             
+                      12             
+                      13             
+  8000                14     rwAD_LSB                EQU     8000h   ;adresa pentru LSB din constanta de incarcare in co
+                             unter
+  8001                15     rwAD_MB                 EQU     8001h   ;adresa pentru MB de incarcare in counter
+  8002                16     rwAD_MSB                EQU     8002h   ;adresa pentru MSB din constanta de incarcare in co
+                             unter
+  8003                17     rwAD_CNT_LD             EQU 8003h       ;adresa pentru citire/scriere valori din/in counter
+  8004                18     wAD_START_STOP  EQU     8004h   ;adresa pentru comanda de start/stop
+  8004                19     rAD_CNT_LSB             EQU     8004h   ;adresa pentru citirea LSB din counter
+  8005                20     wAD_RST                 EQU 8005h       ;adresa pentru comanda de reset
+  8005                21     rAD_CNT_MB              EQU     8005h   ;adresa pentru citirea MB din counter
+  8006                22     wAD_RST_INT0    EQU 8006h       ;adresa pentru comanda de resetare intreruperi
+  8006                23     rAD_CNT_MSB             EQU 8006h       ;adresa pentru citirea MSB din counter
+  8007                24     rwAD_CW_SW              EQU 8007h       ;adresa pentru scrierea/citirea cuvantului de coman
+                             da/stare
+  8008                25     wAD_OUT_LSB             EQU     8008h   ;adresa pentru scrierea LSB pe liniile de iesire
+  8008                26     rAD_IN_LSB              EQU 8008h       ;adresa pentru citirea LSB de pe liniile de intrare
+  8009                27     wAD_OUT_MSB             EQU     8009h   ;adresa pentru scrierea MSB pe liniile de iesire
+  8009                28     rAD_IN_MSB              EQU 8009h       ;adresa pentru citirea MSB de pe liniile de intrare
+                      29     
+                      30             
+                      31             
+                      32             
+  0060                33     BUFFER                  EQU 60h
+  0070                34     AD_CNT_STAT             EQU 70h         ;adresa statusului curent al contorului
+  0071                35     AD_STATUS               EQU 71h         ;adresa statusului curent al modulului
+  0072                36     CW                              EQU 72h         ;adresa cuvantului de comanda
+  0073                37     LSB                             EQU 73h         
+  0074                38     MB                              EQU 74h
+  0075                39     MSB                             EQU 75h
+  0076                40     CNT_LSB                 EQU 76h         ;adresa LSB a registrului de citire din contor
+  0077                41     CNT_MB                  EQU 77h         ;adresa MB a registrului de citire din contor
+  0078                42     CNT_MSB                 EQU 78h         ;adresa MSB a registrului de citire din contor
+  0079                43     CONST_LSB               EQU 79h         ;adresa LSB a registrului de presetare contor
+  007A                44     CONST_MB                EQU 7Ah         ;adresa MB a registrului de presetare contor
+  007B                45     CONST_MSB               EQU 7Bh         ;adresa MSB a registrului de presetare contor
+  007C                46     SW                              EQU 7Ch         ;adresa cuvant de stare
+  007D                47     IO_LSB                  EQU 7Dh         ;adresa LSB pentru liniile IO
+  007E                48     IO_MSB                  EQU 7Eh         ;adresa MSB pentru liniile IO
+  0000                49     CNT_INIT                EQU 00h         ;contorul e initializat cu 0
+  0001                50     CNT_UP                  EQU 01h         ;contorul numara crescator
+  0002                51     CNT_DOWN                EQU     02h             ;contorul numara descrescator
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     2
+
+  0003                52     CNT_STOP                EQU 03h         ;contorul e oprit
+  0051                53     QUIT                    EQU 'Q'
+                      54             
+                      55             
+                      56             
+                      57     ;macro pentru scriere de linie noua
+                      58     PRINT_CR MACRO
+                      59             MOV A, #0Dh
+                      60             LCALL RUT_TX
+                      61             ENDM
+                      62     
+                      63     ;macro pentru scriere "READY"
+                      64     PRINT_READY MACRO
+                      65             MOV DPTR, #MSG_READY
+                      66             LCALL PRINT_MSG
+                      67             ENDM
+                      68     
+                      69     ;macro pentru scriere '0'
+                      70     PRINT_0 MACRO
+                      71             MOV A, #30h
+                      72             LCALL RUT_TX
+                      73             ENDM
+                      74     
+                      75     ;macro pentru scriere '1'
+                      76     PRINT_1 MACRO
+                      77             MOV A, #31h
+                      78             LCALL RUT_TX
+                      79             ENDM
+                      80             
+0000                  81             ORG 0h
+0000 020100           82             LJMP MAIN               ;salt la programul principal
+                      83             
+0003                  84             ORG 03h
+0003 020300           85             LJMP RUT_INT0   ;salt la rutina de intreruperi externe
+                      86             
+0023                  87             ORG 23h
+0023 020400           88             LJMP RUT_RX             ;salt la rutina de receptie seriala
+                      89             
+0100                  90             ORG 100h
+0100                  91     MAIN:
+                      92             
+                      93             
+                      94             
+0100 C2AF             95             CLR IE.7        ;dezactivare globala a intreruperilor
+                      96     ;INITIALIZARE CUVANT DE COMANDA
+0102 E500             97             MOV A, CNT_INIT
+0104 F570             98             MOV AD_CNT_STAT, A
+0106 908007           99             MOV DPTR, #rwAD_CW_SW
+0109 F0              100             MOVX @DPTR, A
+                     101     ;INITIALIZARE CONTOR    
+010A 908000          102             MOV DPTR, #rwAD_LSB
+010D F0              103             MOVX @DPTR, A
+010E 908001          104             MOV DPTR, #rwAD_MB
+0111 F0              105             MOVX @DPTR, A
+0112 908002          106             MOV DPTR, #rwAD_MSB
+0115 F0              107             MOVX @DPTR, A
+0116 908003          108             MOV DPTR, #rwAD_CNT_LD
+0119 F0              109             MOVX @DPTR, A
+                     110     ;PROGRAMARE UART
+011A D29E            111             SETB SCON.6             ;programare mod de lucru 1 pentru UART – SM1
+011C C29F            112             CLR SCON.7              ;programare mod de lucru 1 pentru UART – SM0
+011E 758780          113             MOV PCON, #80h  ;seteaza factor de multiplicare 2
+0121 D2AC            114             SETB IE.4               ;validare intreruperi de la UART 
+0123 758920          115             MOV TMOD, #20h  ;programare timer T1 in modul 2
+0126 758BF3          116             MOV TL1, #0F3h  ;incarca constanta de timp in TL1
+0129 758DF3          117             MOV TH1, #0F3h  ;incarca constanta de timp in TH1
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     3
+
+012C D28E            118             SETB TCON.6             ;pornire timer T1
+012E 906000          119             MOV DPTR, #MSG_WLCM
+0131 120887          120             LCALL PRINT_MSG
+                     121             PRINT_READY
+013A D28C            124             SETB TCON.4             ;validare receptie - REN
+                     125     ;PROGRAMARE INTRERUPERI EXTERNE
+013C D2A8            126             SETB IE.0               ;validare intrerupere /INT0
+013E D288            127             SETB TCON.0             ;setare /INT0 pe front cazator
+0140 D2AF            128             SETB IE.7               ;validare globala a intreruperilor
+                     129     ;ASTEPTARE RECEPTIE COMANDA
+0142 80FE            130             SJMP $
+                     131                     
+0200                 132             ORG 200h
+0200                 133     RUT_TX:
+                     134             
+                     135             
+                     136             
+0200 C29C            137             CLR SCON.4              ;invalidare receptie
+0202 F599            138             MOV SBUF, A             ;transfera caracterul din acumulator in SBUFF
+0204 3099FD          139             JNB SCON.1,$    ;asteptare finalizare transmisie
+0207 C299            140             CLR SCON.1              ;reseteaza flagul de transmisie
+0209 D29C            141             SETB SCON.4             ;validare receptie
+020B 22              142             RET
+                     143             
+0300                 144             ORG 300h
+0300                 145     RUT_INT0:
+                     146             
+                     147             
+                     148             
+0300 906025          149             MOV DPTR, #MSG_INT0
+0303 120887          150             LCALL PRINT_MSG
+                     151             PRINT_READY
+030C 908006          154             MOV DPTR, #wAD_RST_INT0
+030F F0              155             MOVX @DPTR, A
+0310 32              156             RETI
+                     157             
+0400                 158             ORG 400h
+0400                 159     RUT_RX:
+                     160             
+                     161             
+                     162             
+0400 C2AC            163             CLR IE.4                ;invalidare intreruperi de la UART
+0402 E599            164             MOV A, SBUF             ;copiere in acumulator caracterul receptionat
+0404 C298            165             CLR SCON.0              ;resetare flag de receptie
+0406 120899          166             LCALL TO_UPR    ;transformare caracter receptionat in majuscula
+                     167     ;VERIFICARE CARACTER
+0409 B45303          168             CJNE A, #'S', other0
+040C 120500          169             LCALL START_STOP
+040F                 170     other0:
+040F B44903          171             CJNE A, #'I', other1
+0412 12059D          172             LCALL INITIALIZE
+0415                 173     other1:
+0415 B45603          174             CJNE A, #'V', other2
+0418 120758          175             LCALL VIEW_STATUS
+041B                 176     other2:
+041B B45003          177             CJNE A, #'P', other3
+041E 12062E          178             LCALL COMMAND_WORD
+0421                 179     other3:
+0421 B44C03          180             CJNE A, #'L', other5
+0424 120537          181             LCALL LOAD
+                     182     ;other4:
+                     183     ;       CJNE A, #'T', other5
+                     184     ;       LCALL READ_CNT
+0427                 185     other5:
+0427 B45A03          186             CJNE A, #'Z', other6
+042A 120781          187             LCALL READ_IN0
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     4
+
+042D                 188     other6:
+042D B45803          189             CJNE A, #'X', other7
+0430 1207B2          190             LCALL READ_IN1
+0433                 191     other7:
+0433 B44303          192             CJNE A, #'C', other8
+0436 1207E3          193             LCALL READ_IN2
+0439                 194     other8:
+0439 B44203          195             CJNE A, #'B', other9
+043C 120804          196             LCALL WRITE_OUT0
+043F                 197     other9:
+043F B44E03          198             CJNE A, #'N', other10
+0442 120835          199             LCALL WRITE_OUT1
+0445                 200     other10:
+0445 B44D03          201             CJNE A, #'M', other11
+0448 120866          202             LCALL WRITE_OUT2
+044B                 203     other11:
+044B B45203          204             CJNE A, #'R', oend
+044E 1205E4          205             LCALL RESET
+                     206     ;other12:
+                     207     ;       CJNE A, #'O', other13
+                     208     ;       LCALL READ_CONST
+                     209     ;other13:
+                     210     ;       CJNE A, #'U', oend
+                     211     ;       LCALL READ_STATUS
+0451                 212     oend:
+0451 D2AC            213             SETB IE.4               ;validare intreruperi de la UART
+0453 32              214             RETI
+                     215     
+0500                 216             ORG 500h
+0500                 217     START_STOP:
+                     218             
+                     219             
+                     220             
+0500 7453            221             MOV A, #'S'
+0502 120200          222             LCALL RUT_TX
+0505 E570            223             MOV A, AD_CNT_STAT
+0507 B40008          224             CJNE A, #CNT_INIT, ss0          ;verificare daca contorul e pe 0
+050A 906041          225             MOV DPTR, #MSG_START
+050D 757001          226             MOV AD_CNT_STAT, #CNT_UP
+0510 8017            227             SJMP ssend
+0512                 228     ss0:
+0512 B40108          229             CJNE A, #CNT_UP, ss1            ;verificare daca contorul numara crescator
+0515 906054          230             MOV DPTR, #MSG_STOP
+0518 757003          231             MOV AD_CNT_STAT, #CNT_STOP
+051B 800C            232             SJMP ssend
+051D                 233     ss1:
+051D B40308          234             CJNE A, #CNT_STOP, ss2          ;verificare daca contorul e oprit
+0520 906041          235             MOV DPTR, #MSG_START
+0523 757001          236             MOV AD_CNT_STAT, #CNT_UP
+0526 8001            237             SJMP ssend
+0528 22              238     ss2: RET
+0529                 239     ssend:
+0529 120887          240             LCALL PRINT_MSG
+052C 908004          241             MOV DPTR, #wAD_START_STOP       ;incarcare adresa de start/stop
+052F F0              242             MOVX @DPTR, A
+                     243             PRINT_READY
+0536 22              246             RET
+                     247     
+0537                 248     LOAD:
+                     249             
+                     250             
+                     251             
+0537 744C            252             MOV A, #'L'
+0539 120200          253             LCALL RUT_TX
+053C 906066          254             MOV DPTR, #MSG_INITIALIZE
+053F 120887          255             LCALL PRINT_MSG
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     5
+
+0542 906088          256             MOV DPTR, #MSG_LOAD_CNT_LSB
+0545 120887          257             LCALL PRINT_MSG
+0548 1208CA          258             LCALL READ_BYTE
+054B B45107          259             CJNE A, #QUIT, ld0              ;verificare daca se doreste sarirea peste citire LSB
+                     260             PRINT_CR
+0553 8009            263             SJMP ld1
+0555                 264     ld0:
+0555 1208A1          265             LCALL ASCII_TO_HEX              ;conversie din ascii in hexa
+0558 F573            266             MOV LSB, A
+055A 908000          267             MOV DPTR, #rwAD_LSB             ;incarcare adresa LSB registru de presetare
+055D F0              268             MOVX @DPTR, A                   ;scriere in registru
+055E                 269     ld1:    
+055E 9060AB          270             MOV DPTR, #MSG_LOAD_CNT_MB      
+0561 120887          271             LCALL PRINT_MSG
+0564 1208CA          272             LCALL READ_BYTE
+0567 B45107          273             CJNE A, #QUIT, ld2              ;verificare daca se doreste sarirea peste citire MB
+                     274             PRINT_CR
+056F 8009            277             SJMP ld3
+0571                 278     ld2:
+0571 1208A1          279             LCALL ASCII_TO_HEX              ;conversie din ascii in hexa
+0574 F574            280             MOV MB, A
+0576 908001          281             MOV DPTR, #rwAD_MB              ;incarcare adresa MB registru de presetare
+0579 F0              282             MOVX @DPTR, A                   ;scriere in registru
+057A                 283     ld3:
+057A 9060CD          284             MOV DPTR, #MSG_LOAD_CNT_MSB
+057D 120887          285             LCALL PRINT_MSG
+0580 1208CA          286             LCALL READ_BYTE
+0583 B45102          287             CJNE A, #QUIT, ld4              ;verificare daca se doreste sarirea peste citire MSB
+0586 8009            288             SJMP ldend
+0588                 289     ld4:
+0588 1208A1          290             LCALL ASCII_TO_HEX              ;conversie din ascii in hexa
+058B F575            291             MOV MSB, A
+058D 908002          292             MOV DPTR, #rwAD_MSB             ;incarcare adresa MSB registru de presetare
+0590 F0              293             MOVX @DPTR, A                   ;scriere in registru
+0591                 294     ldend:
+                     295             PRINT_CR
+                     298             PRINT_READY
+059C 22              301             RET
+                     302             
+059D                 303     INITIALIZE:
+                     304             
+                     305             
+                     306             
+059D 7449            307             MOV A, #'I'
+059F 120200          308             LCALL RUT_TX
+05A2 906066          309             MOV DPTR, #MSG_INITIALIZE
+05A5 120887          310             LCALL PRINT_MSG
+05A8 908003          311             MOV DPTR, #rwAD_CNT_LD  ;incarcare adresa de incarcare paralela in contoare
+05AB F0              312             MOVX @DPTR, A                   ;scriere in contoare
+                     313             PRINT_READY
+05B2 22              316             RET
+                     317     
+05B3                 318     READ_CNT:
+                     319             
+                     320             
+                     321             
+                     322     ;       MOV A, #'T'
+                     323     ;       LCALL RUT_TX
+                     324     ;       MOV DPTR, #MSG_READ_CNT
+                     325     ;       LCALL PRINT_MSG
+                     326     ;       LCALL READ_CNT0
+                     327     ;       PRINT_CR
+                     328     ;       PRINT_READY
+                     329     ;       RET
+05B3                 330     READ_CNT0:
+05B3 908003          331             MOV DPTR, #rwAD_CNT_LD  ;incarcare adresa registre de citire din contoare
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     6
+
+05B6 E0              332             MOVX A, @DPTR                   ;comanda de citire
+05B7 908004          333             MOV DPTR, #rAD_CNT_LSB  ;incarcare adresa registru de citire LSB
+05BA E0              334             MOVX A, @DPTR                   ;citire LSB
+05BB F576            335             MOV CNT_LSB, A                  ;salvare LSB intern
+05BD 908005          336             MOV DPTR, #rAD_CNT_MB   ;incarcare adresa registru de citire MB
+05C0 E0              337             MOVX A, @DPTR                   ;citire MB
+05C1 F577            338             MOV CNT_MB, A                   ;salvare MB intern
+05C3 908006          339             MOV DPTR, #rAD_CNT_MSB  ;incarcare adresa registru de citire MSB
+05C6 E0              340             MOVX A, @DPTR                   ;citire MSB
+05C7 F578            341             MOV CNT_MSB, A                  ;salvare MSB intern
+                     342             PRINT_CR
+05CE 9060F0          345             MOV DPTR, #MSG_CNT_VAL
+05D1 120887          346             LCALL PRINT_MSG
+                     347     ;AFISARE VALORI CONTOARE
+05D4 E576            348             MOV A, CNT_LSB
+05D6 1208EC          349             LCALL PRINT_BYTE
+05D9 E577            350             MOV A, CNT_MB
+05DB 1208EC          351             LCALL PRINT_BYTE
+05DE E578            352             MOV A, CNT_MSB
+05E0 1208EC          353             LCALL PRINT_BYTE
+05E3 22              354             RET
+                     355     
+05E4                 356     RESET:
+                     357             
+                     358             
+                     359             
+05E4 C0E0            360             PUSH ACC
+05E6 7452            361             MOV A, #'R'
+05E8 120200          362             LCALL RUT_TX
+05EB 906100          363             MOV DPTR, #MSG_RESET
+05EE 120887          364             LCALL PRINT_MSG
+05F1 908005          365             MOV DPTR, #wAD_RST                      ;incarcare adresa de resetare
+05F4 F0              366             MOVX @DPTR, A                           ;comanda de scriere
+                     367             PRINT_READY
+05FB 757000          370             MOV AD_CNT_STAT, #CNT_INIT      ;pune statusul contorului pe 0
+05FE D0E0            371             POP ACC
+0600 22              372             RET
+                     373     
+0601                 374     READ_CONST:
+                     375             
+                     376             
+                     377             
+                     378     ;       MOV A, #'O'
+                     379     ;       LCALL RUT_TX
+                     380     ;       MOV DPTR, #MSG_READ_CONST
+                     381     ;       LCALL PRINT_MSG
+                     382     ;       LCALL READ_CONST0
+                     383     ;       PRINT_CR
+                     384     ;       PRINT_READY
+                     385     ;       RET
+                     386             
+0601                 387     READ_CONST0:
+0601 908000          388             MOV DPTR, #rwAD_LSB             ;incarcare adresa registru de presetare LSB
+0604 E0              389             MOVX A, @DPTR                   ;comanda de citire
+0605 F579            390             MOV CONST_LSB, A                ;salvare LSB intern
+0607 908001          391             MOV DPTR, #rwAD_MB              ;incarcare adresa registru de presetare LSB
+060A E0              392             MOVX A, @DPTR                   ;comanda de citire
+060B F57A            393             MOV CONST_MB, A                 ;salvare MB intern
+060D 908002          394             MOV DPTR, #rwAD_MSB             ;incarcare adresa registru de presetare LSB
+0610 E0              395             MOVX A, @DPTR                   ;comanda de citire
+0611 F57B            396             MOV CONST_MSB, A                ;salvare MSB intern
+                     397             PRINT_CR
+0618 906110          400             MOV DPTR, #MSG_CONST_VAL
+061B 120887          401             LCALL PRINT_MSG
+                     402     ;AFISARE VALORI REGISTRE DE PRESETARE
+061E E579            403             MOV A, CONST_LSB
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     7
+
+0620 1208EC          404             LCALL PRINT_BYTE
+0623 E57A            405             MOV A, CONST_MB
+0625 1208EC          406             LCALL PRINT_BYTE
+0628 E57B            407             MOV A, CONST_MSB
+062A 1208EC          408             LCALL PRINT_BYTE
+062D 22              409             RET
+                     410     
+062E                 411     COMMAND_WORD:
+                     412             
+                     413             
+                     414             
+062E 7450            415             MOV A, #'P'
+0630 120200          416             LCALL RUT_TX
+0633 906123          417             MOV DPTR, #MSG_CW0
+0636 120887          418             LCALL PRINT_MSG
+0639 90613B          419             MOV DPTR, #MSG_CW1
+063C 120887          420             LCALL PRINT_MSG
+063F 1208CA          421             LCALL READ_BYTE
+0642 B45107          422             CJNE A,#QUIT, cw0               ;verificare daca se doreste sarirea peste citire
+                     423             PRINT_CR
+064A 8009            426             SJMP cw1
+064C                 427     cw0:
+064C 1208A1          428             LCALL ASCII_TO_HEX              ;conversie din ascii in hexa
+064F F572            429             MOV CW, A                               ;salvare cuvant de comanda intern
+0651 908007          430             MOV DPTR, #rwAD_CW_SW   ;incarcare adresa de scriere cuvant de comanda
+0654 F0              431             MOVX @DPTR, A                   ;comanda de scriere
+0655                 432     cw1:
+                     433             PRINT_CR
+                     436             PRINT_READY
+0660 22              439             RET
+                     440     
+0661                 441     READ_STATUS:
+                     442             
+                     443             
+                     444             
+                     445     ;       MOV A, #'U'
+                     446     ;       LCALL RUT_TX
+                     447     ;       MOV DPTR, #MSG_STAT
+                     448     ;       LCALL PRINT_MSG
+                     449     ;       PRINT_CR
+                     450     ;       LCALL READ_STATUS0
+                     451     ;       PRINT_CR
+                     452     ;       PRINT_READY
+                     453     ;       RET
+0661                 454     READ_STATUS0:
+0661 906153          455             MOV DPTR, #MSG_STAT_VAL
+0664 120887          456             LCALL PRINT_MSG
+0667 908007          457             MOV DPTR, #rwAD_CW_SW   ;incarcare adresa de citire cuvant de stare
+066A E0              458             MOVX A, @DPTR                   ;comanda de citire
+066B F57C            459             MOV SW, A                               ;salvare cuvant de stare intern
+066D 1208EC          460             LCALL PRINT_BYTE
+0670 E57C            461             MOV A, SW
+                     462             PRINT_CR
+                     465     ;VERIFICARE FIECARE BIT AL CUVANTULUI DE STARE
+                     466     
+0677 906162          467             MOV DPTR, #MSG_STAT0
+067A 120887          468             LCALL PRINT_MSG
+067D E57C            469             MOV A, SW
+067F 20E007          470             JB ACC.0, b0
+                     471             PRINT_0
+0687 8005            474             SJMP b1
+0689                 475     b0:
+                     476             PRINT_1
+068E                 479     b1:
+                     480             PRINT_CR
+                     483     
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     8
+
+0693 90617B          484             MOV DPTR, #MSG_STAT1
+0696 120887          485             LCALL PRINT_MSG
+0699 E57C            486             MOV A, SW
+069B 20E107          487             JB ACC.1, b2
+                     488             PRINT_0
+06A3 8005            491             SJMP b3
+06A5                 492     b2:
+                     493             PRINT_1
+06AA                 496     b3:
+                     497             PRINT_CR
+                     500     
+06AF 906191          501             MOV DPTR, #MSG_STAT2
+06B2 120887          502             LCALL PRINT_MSG
+06B5 E57C            503             MOV A, SW
+06B7 20E207          504             JB ACC.2, b4
+                     505             PRINT_0
+06BF 8005            508             SJMP b5
+06C1                 509     b4:
+                     510             PRINT_1
+06C6                 513     b5:
+                     514             PRINT_CR
+                     517     
+06CB 9061AB          518             MOV DPTR, #MSG_STAT3
+06CE 120887          519             LCALL PRINT_MSG
+06D1 E57C            520             MOV A, SW
+06D3 20E307          521             JB ACC.3, b6
+                     522             PRINT_0
+06DB 8005            525             SJMP b7
+06DD                 526     b6:
+                     527             PRINT_1
+06E2                 530     b7:
+                     531             PRINT_CR
+                     534     
+06E7 9061C9          535             MOV DPTR, #MSG_STAT4
+06EA 120887          536             LCALL PRINT_MSG
+06ED E57C            537             MOV A, SW
+06EF 20E407          538             JB ACC.4, b8
+                     539             PRINT_0
+06F7 8005            542             SJMP b9
+06F9                 543     b8:
+                     544             PRINT_1
+06FE                 547     b9:
+                     548             PRINT_CR
+                     551     
+0703 9061E3          552             MOV DPTR, #MSG_STAT5
+0706 120887          553             LCALL PRINT_MSG
+0709 E57C            554             MOV A, SW
+070B 20E507          555             JB ACC.5, b10
+                     556             PRINT_0
+0713 8005            559             SJMP b11
+0715                 560     b10:
+                     561             PRINT_1
+071A                 564     b11:
+                     565             PRINT_CR
+                     568     
+071F 9061FC          569             MOV DPTR, #MSG_STAT6
+0722 120887          570             LCALL PRINT_MSG
+0725 E57C            571             MOV A, SW
+0727 20E607          572             JB ACC.6, b12
+                     573             PRINT_0
+072F 8005            576             SJMP b13
+0731                 577     b12:
+                     578             PRINT_1
+0736                 581     b13:
+                     582             PRINT_CR
+                     585     
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE     9
+
+073B 906218          586             MOV DPTR, #MSG_STAT7
+073E 120887          587             LCALL PRINT_MSG
+0741 E57C            588             MOV A, SW
+0743 20E707          589             JB ACC.7, b14
+                     590             PRINT_0
+074B 8005            593             SJMP b15
+074D                 594     b14:
+                     595             PRINT_1
+0752                 598     b15:
+                     599             PRINT_CR
+0757 22              602             RET
+                     603     
+0758                 604     VIEW_STATUS:
+                     605             
+                     606             
+                     607             
+0758 C0E0            608             PUSH ACC
+075A 7456            609             MOV A, #'V'
+075C 120200          610             LCALL RUT_TX
+075F 906234          611             MOV DPTR, #MSG_VIEW
+0762 120887          612             LCALL PRINT_MSG
+                     613             PRINT_CR
+076A 120661          616             LCALL READ_STATUS0
+076D 120601          617             LCALL READ_CONST0
+0770 1205B3          618             LCALL READ_CNT0
+                     619             PRINT_CR
+                     622             PRINT_READY
+077E D0E0            625             POP ACC
+0780 22              626             RET
+                     627     
+0781                 628     READ_IN0:
+                     629             
+                     630             
+                     631             
+0781 745A            632             MOV A, #'Z'
+0783 120200          633             LCALL RUT_TX
+0786 90624B          634             MOV DPTR, #MSG_IN0
+0789 120887          635             LCALL PRINT_MSG
+078C 12079B          636             LCALL READ_IN00
+                     637             PRINT_CR
+                     640             PRINT_READY
+079A 22              643             RET
+079B                 644     READ_IN00:
+079B 908008          645             MOV DPTR, #rAD_IN_LSB           ;incarcare adresa de citire linii I0-7
+079E E0              646             MOVX A, @DPTR                           ;comanda de citire
+079F F57D            647             MOV IO_LSB, A                           ;salvare valoare I0-7 intern
+                     648             PRINT_CR
+07A6 906339          651             MOV DPTR, #MSG_IO_VAL
+07A9 120887          652             LCALL PRINT_MSG
+07AC E57D            653             MOV A, IO_LSB
+07AE 1208EC          654             LCALL PRINT_BYTE
+07B1 22              655             RET
+07B2                 656     READ_IN1:
+                     657             
+                     658             
+                     659             
+07B2 7458            660             MOV A, #'X'
+07B4 120200          661             LCALL RUT_TX
+07B7 906271          662             MOV DPTR, #MSG_IN1
+07BA 120887          663             LCALL PRINT_MSG
+07BD 1207CC          664             LCALL READ_IN10
+                     665             PRINT_CR
+                     668             PRINT_READY
+07CB 22              671             RET
+07CC                 672     READ_IN10:
+07CC 908009          673             MOV DPTR, #rAD_IN_MSB           ;incarcare adresa de citire linii I8-15
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    10
+
+07CF E0              674             MOVX A, @DPTR                           ;comanda de citire
+07D0 F57E            675             MOV IO_MSB, A                           ;salvare valoare I8-15 intern
+                     676             PRINT_CR
+07D7 906339          679             MOV DPTR, #MSG_IO_VAL
+07DA 120887          680             LCALL PRINT_MSG
+07DD E57E            681             MOV A, IO_MSB
+07DF 1208EC          682             LCALL PRINT_BYTE
+07E2 22              683             RET
+07E3                 684     READ_IN2:
+                     685             
+                     686             
+                     687             
+07E3 C0E0            688             PUSH ACC
+07E5 7443            689             MOV A, #'C'
+07E7 120200          690             LCALL RUT_TX
+07EA 906298          691             MOV DPTR, #MSG_IN2
+07ED 120887          692             LCALL PRINT_MSG
+07F0 12079B          693             LCALL READ_IN00
+07F3 1207CC          694             LCALL READ_IN10
+                     695             PRINT_CR
+                     698             PRINT_READY
+0801 D0E0            701             POP ACC
+0803 22              702             RET
+                     703             
+0804                 704     WRITE_OUT0:
+                     705             
+                     706             
+                     707             
+0804 7442            708             MOV A, #'B'
+0806 120200          709             LCALL RUT_TX
+0809 9062BF          710             MOV DPTR, #MSG_OUT0
+080C 120887          711             LCALL PRINT_MSG
+080F 12081E          712             LCALL WRITE_OUT00
+                     713             PRINT_CR
+                     716             PRINT_READY
+081D 22              719             RET
+081E                 720     WRITE_OUT00:
+081E 908008          721             MOV DPTR, #wAD_OUT_LSB          ;incarcare adresa de scriere linii      OUT0-7
+0821 E57D            722             MOV A, IO_LSB                           ;incarcare din memoria interna a valorii pt
+                              OUT0-7
+0823 F0              723             MOVX @DPTR, A                           ;comanda de scriere
+                     724             PRINT_CR
+0829 906339          727             MOV DPTR, #MSG_IO_VAL
+082C 120887          728             LCALL PRINT_MSG
+082F E57D            729             MOV A, IO_LSB
+0831 1208EC          730             LCALL PRINT_BYTE
+0834 22              731             RET
+                     732             
+0835                 733     WRITE_OUT1:
+                     734             
+                     735             
+                     736             
+0835 744E            737             MOV A, #'N'
+0837 120200          738             LCALL RUT_TX
+083A 9062E7          739             MOV DPTR, #MSG_OUT1
+083D 120887          740             LCALL PRINT_MSG
+0840 12084F          741             LCALL WRITE_OUT10
+                     742             PRINT_CR
+                     745             PRINT_READY
+084E 22              748             RET
+084F                 749     WRITE_OUT10:
+084F 908009          750             MOV DPTR, #wAD_OUT_MSB          ;incarcare adresa de scriere linii      OUT8-15
+0852 E57E            751             MOV A, IO_MSB                           ;incarcare din memoria interna a valorii pt
+                              OUT8-15
+0854 F0              752             MOVX @DPTR, A                           ;comanda de scriere
+                     753             PRINT_CR
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    11
+
+085A 906339          756             MOV DPTR, #MSG_IO_VAL
+085D 120887          757             LCALL PRINT_MSG
+0860 E57E            758             MOV A, IO_MSB
+0862 1208EC          759             LCALL PRINT_BYTE
+0865 22              760             RET
+                     761             
+0866                 762     WRITE_OUT2:
+                     763             
+                     764             
+                     765             
+0866 C0E0            766             PUSH ACC
+0868 744D            767             MOV A, #'M'
+086A 120200          768             LCALL RUT_TX
+086D 906310          769             MOV DPTR, #MSG_OUT2
+0870 120887          770             LCALL PRINT_MSG
+0873 12081E          771             LCALL WRITE_OUT00
+0876 12084F          772             LCALL WRITE_OUT10
+                     773             PRINT_CR
+                     776             PRINT_READY
+0884 D0E0            779             POP ACC
+0886 22              780             RET
+0887                 781     PRINT_MSG:
+                     782             
+                     783             
+                     784             
+0887 C0E0            785             PUSH ACC        
+0889 7800            786             MOV R0, #00h
+088B                 787     print0:
+088B E8              788             MOV A, R0
+088C 93              789             MOVC A, @A+DPTR
+088D B40003          790             CJNE A, #00h, print1
+0890 D0E0            791             POP ACC
+0892 22              792             RET
+0893                 793     print1:
+0893 120200          794             LCALL RUT_TX
+0896 08              795             INC R0
+0897 80F2            796             SJMP print0
+                     797     
+0899                 798     TO_UPR:
+                     799             
+                     800             
+                     801             
+0899 B46100          802             CJNE A, #'a', upr0
+089C                 803     upr0: 
+089C 4002            804             JC upr1
+089E 9420            805             SUBB A, #20h
+08A0                 806     upr1:
+08A0 22              807             RET
+                     808     
+08A1                 809     ASCII_TO_HEX:
+                     810             
+                     811             
+                     812             
+08A1 18              813             DEC R0
+08A2 18              814             DEC R0
+08A3 E6              815             MOV A, @R0
+08A4 1208B0          816             LCALL CONV_ASCII
+08A7 C4              817             SWAP A
+08A8 F9              818             MOV R1, A
+08A9 08              819             INC R0
+08AA E6              820             MOV A, @R0
+08AB 1208B0          821             LCALL CONV_ASCII
+08AE 29              822             ADD A, R1
+08AF 22              823             RET
+                     824     
+08B0                 825     CONV_ASCII:
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    12
+
+08B0 B43A00          826             CJNE A, #3Ah, conv0
+08B3                 827     conv0:
+08B3 4003            828             JC conv1
+08B5 9437            829             SUBB A, #37h
+08B7 22              830             RET
+08B8                 831     conv1:
+08B8 C2D7            832             CLR CY
+08BA 9430            833             SUBB A, #30h
+08BC 22              834             RET
+                     835             
+08BD                 836     HEX_TO_ASCII:
+                     837             
+                     838             
+                     839             
+08BD 540F            840             ANL A, #0Fh
+08BF B40A00          841             CJNE A, #0Ah, hex0
+08C2                 842     hex0:
+08C2 4003            843             JC hex1
+08C4 2437            844             ADD A, #37h
+08C6 22              845             RET
+08C7                 846     hex1:
+08C7 2430            847             ADD A, #30h
+08C9 22              848             RET
+                     849             
+08CA                 850     READ_BYTE:
+                     851             
+                     852             
+                     853             
+08CA 7860            854             MOV R0, #BUFFER
+08CC                 855     rd0:
+08CC 3098FD          856             JNB SCON.0, $
+08CF C298            857             CLR SCON.0
+08D1 E599            858             MOV A, SBUF
+08D3 120899          859             LCALL TO_UPR
+08D6 B45103          860             CJNE A, #Quit, rd1
+08D9 C298            861             CLR SCON.0
+08DB 22              862             RET
+08DC                 863     rd1:
+08DC 120200          864             LCALL RUT_TX
+08DF F6              865             MOV @R0, A
+08E0 B40D01          866             CJNE A, #0Dh, rd2
+08E3 22              867             RET
+08E4                 868     rd2:
+08E4 C298            869             CLR SCON.0
+08E6 08              870             INC R0
+08E7 B80FE2          871             CJNE R0, #0Fh, rd0
+08EA 80DE            872             SJMP READ_BYTE
+                     873     
+08EC                 874     PRINT_BYTE:
+                     875             
+                     876             
+                     877             
+08EC C0E0            878             PUSH ACC
+08EE C4              879             SWAP A
+08EF 1208BD          880             LCALL HEX_TO_ASCII
+08F2 120200          881             LCALL RUT_TX
+08F5 D0E0            882             POP ACC
+08F7 1208BD          883             LCALL HEX_TO_ASCII
+08FA 120200          884             LCALL RUT_TX
+08FD 22              885             RET
+                     886             
+6000                 887             ORG 6000h
+                     888             
+                     889             
+                     890             
+6000 50524F49        891     MSG_WLCM: DB                    "PROIECT SISTEME INCORPORATE", 0Dh, 00h
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    13
+
+6004 45435420                
+6008 53495354                
+600C 454D4520                
+6010 494E434F                
+6014 52504F52                
+6018 4154450D                
+601C 00                      
+601D 52454144        892     MSG_READY: DB                   "READY", 0Dh, 3Eh, 00h
+6021 590D3E00                
+6025 0D496E74        893     MSG_INT0: DB                    0Dh, "Intrerupere generata hard", 0Dh, 00h
+6029 72657275                
+602D 70657265                
+6031 2067656E                
+6035 65726174                
+6039 61206861                
+603D 72640D00                
+6041 0D436F6D        894     MSG_START: DB                   0Dh, "Comanda de start", 0Dh, 00h
+6045 616E6461                
+6049 20646520                
+604D 73746172                
+6051 740D00                  
+6054 0D436F6D        895     MSG_STOP: DB                    0Dh, "Comanda de stop", 0Dh, 00h
+6058 616E6461                
+605C 20646520                
+6060 73746F70                
+6064 0D00                    
+6066 0D496E63        896     MSG_INITIALIZE: DB              0Dh, "Incarcare constante de numarare", 0Dh, 00h
+606A 61726361                
+606E 72652063                
+6072 6F6E7374                
+6076 616E7465                
+607A 20646520                
+607E 6E756D61                
+6082 72617265                
+6086 0D00                    
+6088 312E2049        897     MSG_LOAD_CNT_LSB: DB    "1. Introduceti valoare LSB (hexa):", 00h
+608C 6E74726F                
+6090 64756365                
+6094 74692076                
+6098 616C6F61                
+609C 7265204C                
+60A0 53422028                
+60A4 68657861                
+60A8 293A00                  
+60AB 322E2049        898     MSG_LOAD_CNT_MB: DB             "2. Introduceti valoare MB (hexa):", 00h
+60AF 6E74726F                
+60B3 64756365                
+60B7 74692076                
+60BB 616C6F61                
+60BF 7265204D                
+60C3 42202868                
+60C7 65786129                
+60CB 3A00                    
+60CD 332E2049        899     MSG_LOAD_CNT_MSB: DB    "3. Introduceti valoare MSB (hexa):", 00h
+60D1 6E74726F                
+60D5 64756365                
+60D9 74692076                
+60DD 616C6F61                
+60E1 7265204D                
+60E5 53422028                
+60E9 68657861                
+60ED 293A00                  
+                     900     ;MSG_READ_CNT: DB       0Dh, "Comanda citire contor", 0Dh, 00h
+60F0 56616C6F        901     MSG_CNT_VAL: DB                 "Valoare contor:", 00h
+60F4 61726520                
+60F8 636F6E74                
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    14
+
+60FC 6F723A00                
+6100 0D436F6D        902     MSG_RESET: DB                   0Dh,"Comanda Reset", 0Dh, 00h
+6104 616E6461                
+6108 20526573                
+610C 65740D00                
+                     903     ;MSG_READ_CONST:        DB              0Dh, "Comanda citire constante de incarcare", 0Dh, 
+                             00h
+6110 56616C6F        904     MSG_CONST_VAL:   DB             "Valoare presetata:", 00h       
+6114 61726520                
+6118 70726573                
+611C 65746174                
+6120 613A00                  
+6123 0D50726F        905     MSG_CW0: DB                             0Dh, "Programare valoarea CC", 00h
+6127 6772616D                
+612B 61726520                
+612F 76616C6F                
+6133 61726561                
+6137 20434300                
+613B 0D496E74        906     MSG_CW1: DB                             0Dh, "Introduceti CC (hexa):", 00h
+613F 726F6475                
+6143 63657469                
+6147 20434320                
+614B 28686578                
+614F 61293A00                
+                     907     ;MSG_STAT: DB                   0Dh, "Comanda de citire cuvant de stare",0Dh,00h
+6153 53746172        908     MSG_STAT_VAL: DB                "Stare Contor: ", 00h
+6157 6520436F                
+615B 6E746F72                
+615F 3A2000                  
+6162 53746174        909     MSG_STAT0: DB                   "Status.0 - Stare Contor:", 00h
+6166 75732E30                
+616A 202D2053                
+616E 74617265                
+6172 20436F6E                
+6176 746F723A                
+617A 00                      
+617B 53746174        910     MSG_STAT1: DB                   "Status.1 - Rezolutie:", 00h
+617F 75732E31                
+6183 202D2052                
+6187 657A6F6C                
+618B 75746965                
+618F 3A00                    
+6191 53746174        911     MSG_STAT2: DB                   "Status.2 - Sens Numarare:", 00h
+6195 75732E32                
+6199 202D2053                
+619D 656E7320                
+61A1 4E756D61                
+61A5 72617265                
+61A9 3A00                    
+61AB 53746174        912     MSG_STAT3: DB                   "Status.3 - Directie Numarare:", 00h
+61AF 75732E33                
+61B3 202D2044                
+61B7 69726563                
+61BB 74696520                
+61BF 4E756D61                
+61C3 72617265                
+61C7 3A00                    
+61C9 53746174        913     MSG_STAT4: DB                   "Status.4 - Autoincarcare:", 00h
+61CD 75732E34                
+61D1 202D2041                
+61D5 75746F69                
+61D9 6E636172                
+61DD 63617265                
+61E1 3A00                    
+61E3 53746174        914     MSG_STAT5: DB                   "Status.5 - Fanion /INT0:", 00h
+61E7 75732E35                
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    15
+
+61EB 202D2046                
+61EF 616E696F                
+61F3 6E202F49                
+61F7 4E54303A                
+61FB 00                      
+61FC 53746174        915     MSG_STAT6: DB                   "Status.6 - Strobare grup 1:", 00h
+6200 75732E36                
+6204 202D2053                
+6208 74726F62                
+620C 61726520                
+6210 67727570                
+6214 20313A00                
+6218 53746174        916     MSG_STAT7: DB                   "Status.7 - Strobare grup 2:", 00h
+621C 75732E37                
+6220 202D2053                
+6224 74726F62                
+6228 61726520                
+622C 67727570                
+6230 20323A00                
+6234 0D436F6D        917     MSG_VIEW: DB                    0Dh, "Comanda Vizualizare:", 0Dh, 00h
+6238 616E6461                
+623C 2056697A                
+6240 75616C69                
+6244 7A617265                
+6248 3A0D00                  
+624B 0D436974        918     MSG_IN0: DB                             0Dh, "Citire valori linii de intrare I0-7:", 00h
+624F 69726520                
+6253 76616C6F                
+6257 7269206C                
+625B 696E6969                
+625F 20646520                
+6263 696E7472                
+6267 61726520                
+626B 49302D37                
+626F 3A00                    
+6271 0D436974        919     MSG_IN1: DB                             0Dh, "Citire valori linii de intrare I8-15:", 00h
+6275 69726520                
+6279 76616C6F                
+627D 7269206C                
+6281 696E6969                
+6285 20646520                
+6289 696E7472                
+628D 61726520                
+6291 49382D31                
+6295 353A00                  
+6298 0D436974        920     MSG_IN2: DB                             0Dh, "Citire valori linii de intrare I0-15:", 00h
+629C 69726520                
+62A0 76616C6F                
+62A4 7269206C                
+62A8 696E6969                
+62AC 20646520                
+62B0 696E7472                
+62B4 61726520                
+62B8 49302D31                
+62BC 353A00                  
+                     921     ;MSG_IN0_VAL: DB                        "Valoare I0-7:", 00h
+                     922     ;MSG_IN1_VAL: DB                        "Valoare I8-15:", 00h
+62BF 0D536372        923     MSG_OUT0: DB                    0Dh, "Scriere valori linii de iesire OUT0-7:", 00h
+62C3 69657265                
+62C7 2076616C                
+62CB 6F726920                
+62CF 6C696E69                
+62D3 69206465                
+62D7 20696573                
+62DB 69726520                
+62DF 4F555430                
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    16
+
+62E3 2D373A00                
+62E7 0D536372        924     MSG_OUT1: DB                    0Dh, "Scriere valori linii de iesire OUT8-15:", 00h
+62EB 69657265                
+62EF 2076616C                
+62F3 6F726920                
+62F7 6C696E69                
+62FB 69206465                
+62FF 20696573                
+6303 69726520                
+6307 4F555438                
+630B 2D31353A                
+630F 00                      
+6310 0D536372        925     MSG_OUT2: DB                    0Dh, "Scriere valori linii de iesire OUT0-15:", 00h
+6314 69657265                
+6318 2076616C                
+631C 6F726920                
+6320 6C696E69                
+6324 69206465                
+6328 20696573                
+632C 69726520                
+6330 4F555430                
+6334 2D31353A                
+6338 00                      
+                     926     ;MSG_OUT0_VAL: DB               "Valoare scrisa la OUT0-7:", 00h
+                     927     ;MSG_OUT1_VAL: DB               "Valoare scrisa la OUT8-15:", 00h
+6339 56616C6F        928     MSG_IO_VAL: DB                  "Valoare:", 00h
+633D 6172653A                
+6341 00                      
+                     929     END
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    17
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+ACC. . . . . . . .  D ADDR   00E0H   A   
+AD_CNT_STAT. . . .  N NUMB   0070H   A   
+AD_STATUS. . . . .  N NUMB   0071H   A   
+ASCII_TO_HEX . . .  C ADDR   08A1H   A   
+B0 . . . . . . . .  C ADDR   0689H   A   
+B1 . . . . . . . .  C ADDR   068EH   A   
+B10. . . . . . . .  C ADDR   0715H   A   
+B11. . . . . . . .  C ADDR   071AH   A   
+B12. . . . . . . .  C ADDR   0731H   A   
+B13. . . . . . . .  C ADDR   0736H   A   
+B14. . . . . . . .  C ADDR   074DH   A   
+B15. . . . . . . .  C ADDR   0752H   A   
+B2 . . . . . . . .  C ADDR   06A5H   A   
+B3 . . . . . . . .  C ADDR   06AAH   A   
+B4 . . . . . . . .  C ADDR   06C1H   A   
+B5 . . . . . . . .  C ADDR   06C6H   A   
+B6 . . . . . . . .  C ADDR   06DDH   A   
+B7 . . . . . . . .  C ADDR   06E2H   A   
+B8 . . . . . . . .  C ADDR   06F9H   A   
+B9 . . . . . . . .  C ADDR   06FEH   A   
+BUFFER . . . . . .  N NUMB   0060H   A   
+CNT_DOWN . . . . .  N NUMB   0002H   A   
+CNT_INIT . . . . .  N NUMB   0000H   A   
+CNT_LSB. . . . . .  N NUMB   0076H   A   
+CNT_MB . . . . . .  N NUMB   0077H   A   
+CNT_MSB. . . . . .  N NUMB   0078H   A   
+CNT_STOP . . . . .  N NUMB   0003H   A   
+CNT_UP . . . . . .  N NUMB   0001H   A   
+COMMAND_WORD . . .  C ADDR   062EH   A   
+CONST_LSB. . . . .  N NUMB   0079H   A   
+CONST_MB . . . . .  N NUMB   007AH   A   
+CONST_MSB. . . . .  N NUMB   007BH   A   
+CONV0. . . . . . .  C ADDR   08B3H   A   
+CONV1. . . . . . .  C ADDR   08B8H   A   
+CONV_ASCII . . . .  C ADDR   08B0H   A   
+CW . . . . . . . .  N NUMB   0072H   A   
+CW0. . . . . . . .  C ADDR   064CH   A   
+CW1. . . . . . . .  C ADDR   0655H   A   
+CY . . . . . . . .  B ADDR   00D0H.7 A   
+HEX0 . . . . . . .  C ADDR   08C2H   A   
+HEX1 . . . . . . .  C ADDR   08C7H   A   
+HEX_TO_ASCII . . .  C ADDR   08BDH   A   
+IE . . . . . . . .  D ADDR   00A8H   A   
+INITIALIZE . . . .  C ADDR   059DH   A   
+IO_LSB . . . . . .  N NUMB   007DH   A   
+IO_MSB . . . . . .  N NUMB   007EH   A   
+LD0. . . . . . . .  C ADDR   0555H   A   
+LD1. . . . . . . .  C ADDR   055EH   A   
+LD2. . . . . . . .  C ADDR   0571H   A   
+LD3. . . . . . . .  C ADDR   057AH   A   
+LD4. . . . . . . .  C ADDR   0588H   A   
+LDEND. . . . . . .  C ADDR   0591H   A   
+LOAD . . . . . . .  C ADDR   0537H   A   
+LSB. . . . . . . .  N NUMB   0073H   A   
+MAIN . . . . . . .  C ADDR   0100H   A   
+MB . . . . . . . .  N NUMB   0074H   A   
+MSB. . . . . . . .  N NUMB   0075H   A   
+MSG_CNT_VAL. . . .  C ADDR   60F0H   A   
+MSG_CONST_VAL. . .  C ADDR   6110H   A   
+MSG_CW0. . . . . .  C ADDR   6123H   A   
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    18
+
+MSG_CW1. . . . . .  C ADDR   613BH   A   
+MSG_IN0. . . . . .  C ADDR   624BH   A   
+MSG_IN1. . . . . .  C ADDR   6271H   A   
+MSG_IN2. . . . . .  C ADDR   6298H   A   
+MSG_INITIALIZE . .  C ADDR   6066H   A   
+MSG_INT0 . . . . .  C ADDR   6025H   A   
+MSG_IO_VAL . . . .  C ADDR   6339H   A   
+MSG_LOAD_CNT_LSB .  C ADDR   6088H   A   
+MSG_LOAD_CNT_MB. .  C ADDR   60ABH   A   
+MSG_LOAD_CNT_MSB .  C ADDR   60CDH   A   
+MSG_OUT0 . . . . .  C ADDR   62BFH   A   
+MSG_OUT1 . . . . .  C ADDR   62E7H   A   
+MSG_OUT2 . . . . .  C ADDR   6310H   A   
+MSG_READY. . . . .  C ADDR   601DH   A   
+MSG_RESET. . . . .  C ADDR   6100H   A   
+MSG_START. . . . .  C ADDR   6041H   A   
+MSG_STAT0. . . . .  C ADDR   6162H   A   
+MSG_STAT1. . . . .  C ADDR   617BH   A   
+MSG_STAT2. . . . .  C ADDR   6191H   A   
+MSG_STAT3. . . . .  C ADDR   61ABH   A   
+MSG_STAT4. . . . .  C ADDR   61C9H   A   
+MSG_STAT5. . . . .  C ADDR   61E3H   A   
+MSG_STAT6. . . . .  C ADDR   61FCH   A   
+MSG_STAT7. . . . .  C ADDR   6218H   A   
+MSG_STAT_VAL . . .  C ADDR   6153H   A   
+MSG_STOP . . . . .  C ADDR   6054H   A   
+MSG_VIEW . . . . .  C ADDR   6234H   A   
+MSG_WLCM . . . . .  C ADDR   6000H   A   
+OEND . . . . . . .  C ADDR   0451H   A   
+OTHER0 . . . . . .  C ADDR   040FH   A   
+OTHER1 . . . . . .  C ADDR   0415H   A   
+OTHER10. . . . . .  C ADDR   0445H   A   
+OTHER11. . . . . .  C ADDR   044BH   A   
+OTHER2 . . . . . .  C ADDR   041BH   A   
+OTHER3 . . . . . .  C ADDR   0421H   A   
+OTHER5 . . . . . .  C ADDR   0427H   A   
+OTHER6 . . . . . .  C ADDR   042DH   A   
+OTHER7 . . . . . .  C ADDR   0433H   A   
+OTHER8 . . . . . .  C ADDR   0439H   A   
+OTHER9 . . . . . .  C ADDR   043FH   A   
+PCON . . . . . . .  D ADDR   0087H   A   
+PRINT0 . . . . . .  C ADDR   088BH   A   
+PRINT1 . . . . . .  C ADDR   0893H   A   
+PRINT_BYTE . . . .  C ADDR   08ECH   A   
+PRINT_MSG. . . . .  C ADDR   0887H   A   
+QUIT . . . . . . .  N NUMB   0051H   A   
+RAD_CNT_LSB. . . .  N NUMB   8004H   A   
+RAD_CNT_MB . . . .  N NUMB   8005H   A   
+RAD_CNT_MSB. . . .  N NUMB   8006H   A   
+RAD_IN_LSB . . . .  N NUMB   8008H   A   
+RAD_IN_MSB . . . .  N NUMB   8009H   A   
+RD0. . . . . . . .  C ADDR   08CCH   A   
+RD1. . . . . . . .  C ADDR   08DCH   A   
+RD2. . . . . . . .  C ADDR   08E4H   A   
+READ_BYTE. . . . .  C ADDR   08CAH   A   
+READ_CNT . . . . .  C ADDR   05B3H   A   
+READ_CNT0. . . . .  C ADDR   05B3H   A   
+READ_CONST . . . .  C ADDR   0601H   A   
+READ_CONST0. . . .  C ADDR   0601H   A   
+READ_IN0 . . . . .  C ADDR   0781H   A   
+READ_IN00. . . . .  C ADDR   079BH   A   
+READ_IN1 . . . . .  C ADDR   07B2H   A   
+READ_IN10. . . . .  C ADDR   07CCH   A   
+READ_IN2 . . . . .  C ADDR   07E3H   A   
+READ_STATUS. . . .  C ADDR   0661H   A   
+READ_STATUS0 . . .  C ADDR   0661H   A   
+A51 MACRO ASSEMBLER  PROIECT                                                              01/31/2022 19:04:16 PAGE    19
+
+RESET. . . . . . .  C ADDR   05E4H   A   
+RUT_INT0 . . . . .  C ADDR   0300H   A   
+RUT_RX . . . . . .  C ADDR   0400H   A   
+RUT_TX . . . . . .  C ADDR   0200H   A   
+RWAD_CNT_LD. . . .  N NUMB   8003H   A   
+RWAD_CW_SW . . . .  N NUMB   8007H   A   
+RWAD_LSB . . . . .  N NUMB   8000H   A   
+RWAD_MB. . . . . .  N NUMB   8001H   A   
+RWAD_MSB . . . . .  N NUMB   8002H   A   
+SBUF . . . . . . .  D ADDR   0099H   A   
+SCON . . . . . . .  D ADDR   0098H   A   
+SS0. . . . . . . .  C ADDR   0512H   A   
+SS1. . . . . . . .  C ADDR   051DH   A   
+SS2. . . . . . . .  C ADDR   0528H   A   
+SSEND. . . . . . .  C ADDR   0529H   A   
+START_STOP . . . .  C ADDR   0500H   A   
+SW . . . . . . . .  N NUMB   007CH   A   
+TCON . . . . . . .  D ADDR   0088H   A   
+TH1. . . . . . . .  D ADDR   008DH   A   
+TL1. . . . . . . .  D ADDR   008BH   A   
+TMOD . . . . . . .  D ADDR   0089H   A   
+TO_UPR . . . . . .  C ADDR   0899H   A   
+UPR0 . . . . . . .  C ADDR   089CH   A   
+UPR1 . . . . . . .  C ADDR   08A0H   A   
+VIEW_STATUS. . . .  C ADDR   0758H   A   
+WAD_OUT_LSB. . . .  N NUMB   8008H   A   
+WAD_OUT_MSB. . . .  N NUMB   8009H   A   
+WAD_RST. . . . . .  N NUMB   8005H   A   
+WAD_RST_INT0 . . .  N NUMB   8006H   A   
+WAD_START_STOP . .  N NUMB   8004H   A   
+WRITE_OUT0 . . . .  C ADDR   0804H   A   
+WRITE_OUT00. . . .  C ADDR   081EH   A   
+WRITE_OUT1 . . . .  C ADDR   0835H   A   
+WRITE_OUT10. . . .  C ADDR   084FH   A   
+WRITE_OUT2 . . . .  C ADDR   0866H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)
